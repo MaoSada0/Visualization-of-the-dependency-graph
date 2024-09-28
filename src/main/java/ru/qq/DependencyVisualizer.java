@@ -24,6 +24,8 @@ public class DependencyVisualizer {
     public void process() throws Exception {
         Path tempDir = Files.createTempDirectory("nupkg");
 
+        System.out.println(tempDir.toString());
+
         unzipNupkg(pathToPackage, tempDir.toString());
 
         File nuspecFile = findNuspecFile(tempDir);
@@ -87,14 +89,23 @@ public class DependencyVisualizer {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(nuspecFile);
-        NodeList dependencyNodes = doc.getElementsByTagName("dependency");
+        NodeList groupNodes = doc.getElementsByTagName("group");
 
-        for (int i = 0; i < dependencyNodes.getLength(); i++) {
-            Element dependency = (Element) dependencyNodes.item(i);
-            String packageId = dependency.getAttribute("id");
-            String version = dependency.getAttribute("version");
-            dependencies.computeIfAbsent(packageId, k -> new ArrayList<>()).add(version);
+        for(int i = 0; i < groupNodes.getLength(); i++){
+            Element group = (Element) groupNodes.item(i);
+            String targetFramework = group.getAttribute("targetFramework");
+            dependencies.computeIfAbsent("this", k -> new ArrayList<>()).add(targetFramework);
+
+            NodeList dn = group.getElementsByTagName("dependency");
+
+            for(int j = 0; j < dn.getLength(); j++){
+                Element dependency = (Element) dn.item(j);
+                String packageId = dependency.getAttribute("id");
+                String version = dependency.getAttribute("version");
+                dependencies.computeIfAbsent(targetFramework, k -> new ArrayList<>()).add( packageId + version);
+            }
         }
+
         return dependencies;
     }
 
@@ -104,12 +115,14 @@ public class DependencyVisualizer {
         sb.append("@startuml\n");
 
         for(String packageName: dependencies.keySet()){
-            for(String dep: dependencies.get(packageName)){
+            for(String dep: dependencies.get(packageName)) {
                 sb.append(String.format("\"%s\" --> \"%s\"\n", packageName, dep));
             }
         }
 
         sb.append("@enduml\n");
+
+        System.out.println(sb.toString());
         return sb.toString();
     }
 
